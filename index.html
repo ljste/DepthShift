@@ -7,14 +7,29 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="instructions">
-        Click the screen to lock mouse for looking.<br>
-        Use WASD keys to move. SPACE to Jump.<br>
-        Press ESC to unlock mouse.<br>
-        <span style="color: red;">Avoid the red ball!</span>
+    <div id="startScreen">
+        <h1>DepthShift</h1>
+        <p>Escape the Maze. Avoid the Red Chaser.</p>
+        <button id="startButton">Start Game</button>
+        <div class="start-instructions">
+            Use WASD to Move<br>
+            SPACE to Jump<br>
+            Mouse to Look<br>
+            Click Screen to Lock Mouse / ESC to Pause/Unlock
+        </div>
     </div>
 
-    <div id="gameOverScreen" style="display: none;">
+    <div id="pauseScreen">
+        <h1>Paused</h1>
+        <p>Click the screen to resume</p>
+    </div>
+
+    <div id="instructions">
+        WASD: Move | SPACE: Jump | Mouse: Look<br>
+        ESC to Pause/Unlock Mouse | <span style="color: red;">Avoid the red ball!</span>
+    </div>
+
+    <div id="gameOverScreen">
         <h1>Game Over!</h1>
         <button id="restartButton">Restart</button>
     </div>
