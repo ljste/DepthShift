@@ -1,40 +1,27 @@
 import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.139.2/three.module.js';
 
-// --- Setup ---
+let gameOver = false;
+const gameOverScreen = document.getElementById('gameOverScreen');
+const restartButton = document.getElementById('restartButton');
+const instructionsDiv = document.getElementById('instructions');
+let isPointerLocked = false;
+
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xadd8e6); // Light blue sky
+scene.background = new THREE.Color(0xadd8e6);
 
-const camera = new THREE.PerspectiveCamera(
-    75, // Field of View
-    window.innerWidth / window.innerHeight, // Aspect Ratio
-    0.1, // Near clipping plane
-    1000 // Far clipping plane
-);
-
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// --- Lighting ---
-// Ambient light (provides overall illumination)
-const ambientLight = new THREE.AmbientLight(0x606060); // Soft white light
+const ambientLight = new THREE.AmbientLight(0x606060);
 scene.add(ambientLight);
-
-// Directional light (simulates sunlight)
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-directionalLight.position.set(10, 15, 10); // Position the light
-directionalLight.castShadow = true; // Enable shadows (more computationally expensive)
+directionalLight.position.set(10, 15, 10);
+directionalLight.castShadow = true;
 scene.add(directionalLight);
+renderer.shadowMap.enabled = true;
 
-// Optional: Configure shadow properties for better quality
-// directionalLight.shadow.mapSize.width = 1024;
-// directionalLight.shadow.mapSize.height = 1024;
-// directionalLight.shadow.camera.near = 0.5;
-// directionalLight.shadow.camera.far = 50;
-
-renderer.shadowMap.enabled = true; // Enable shadow rendering
-
-// --- Maze Definition ---
 const mazeLayout = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     [1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
@@ -47,160 +34,361 @@ const mazeLayout = [
     [1, 0, 1, 1, 1, 1, 1, 1, 1, 1],
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
+const wallSize = 5;
+const wallHeight = 3;
+const mazeRows = mazeLayout.length;
+const mazeCols = mazeLayout[0].length;
+const walls = [];
+const wallBoxes = [];
+const wallMeshes = [];
+const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
+const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, side: THREE.DoubleSide });
 
-const wallSize = 5; // Size of each wall block
-const wallHeight = 3; // How tall the walls are
-const walls = []; // Array to store wall meshes for collision detection
-
-// Materials
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 }); // Grey walls
-const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, side: THREE.DoubleSide }); // Dark grey floor
-
-// --- Maze Geometry Generation ---
-for (let row = 0; row < mazeLayout.length; row++) {
-    for (let col = 0; col < mazeLayout[row].length; col++) {
+for (let row = 0; row < mazeRows; row++) {
+    for (let col = 0; col < mazeCols; col++) {
         if (mazeLayout[row][col] === 1) {
             const wallGeometry = new THREE.BoxGeometry(wallSize, wallHeight, wallSize);
             const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
-
-            // Position calculation: Center blocks on grid points
-            wallMesh.position.set(
-                col * wallSize, // x
-                wallHeight / 2, // y (center vertically)
-                row * wallSize  // z
-            );
-             wallMesh.castShadow = true;
-             wallMesh.receiveShadow = true;
+            const worldPos = gridToWorld(row, col);
+            wallMesh.position.set(worldPos.x, wallHeight / 2, worldPos.z);
+            wallMesh.castShadow = true;
+            wallMesh.receiveShadow = true;
             scene.add(wallMesh);
-            walls.push(wallMesh); // Add to collision array
+            walls.push(wallMesh);
+            wallMeshes.push(wallMesh);
+            const box = new THREE.Box3().setFromObject(wallMesh);
+            box.min.y -= 0.1;
+            wallBoxes.push(box);
         }
     }
 }
 
-// --- Floor Generation ---
-const mazeWidth = mazeLayout[0].length * wallSize;
-const mazeDepth = mazeLayout.length * wallSize;
+const mazeWidth = mazeCols * wallSize;
+const mazeDepth = mazeRows * wallSize;
 const floorGeometry = new THREE.PlaneGeometry(mazeWidth, mazeDepth);
 const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-
-floorMesh.rotation.x = -Math.PI / 2; // Rotate plane to be horizontal
-floorMesh.position.y = 0; // Place floor at ground level
-// Adjust position to center the floor under the grid
-floorMesh.position.x = (mazeLayout[0].length / 2) * wallSize - wallSize / 2;
-floorMesh.position.z = (mazeLayout.length / 2) * wallSize - wallSize / 2;
-floorMesh.receiveShadow = true; // Allow floor to receive shadows
+floorMesh.rotation.x = -Math.PI / 2;
+floorMesh.position.y = 0;
+floorMesh.position.x = (mazeCols / 2) * wallSize - wallSize / 2;
+floorMesh.position.z = (mazeRows / 2) * wallSize - wallSize / 2;
+floorMesh.receiveShadow = true;
 scene.add(floorMesh);
 
+const playerHeight = wallHeight * 0.6;
+const playerRadius = 0.4;
+const moveSpeed = 5.0;
+const mouseSensitivity = 0.002;
+const gravity = 20.0;
+const jumpStrength = 5.0;
+let playerVelocityY = 0;
+let onGround = true;
 
-// --- Player Setup ---
-const playerHeight = wallHeight * 0.6; // Eye level slightly below wall top
-const playerWidth = 0.5; // Player's approximate width for collision
-const moveSpeed = 5.0; // Units per second
-const turnSpeed = Math.PI / 2; // Radians per second (90 degrees)
-
-// Find starting position (first '0' after the border)
-let startX = 1 * wallSize;
-let startZ = 1 * wallSize;
-for (let r = 1; r < mazeLayout.length - 1; r++) {
-    for (let c = 1; c < mazeLayout[r].length - 1; c++) {
+let startPosWorld = gridToWorld(1, 1);
+findStartPosition:
+for (let r = 1; r < mazeRows - 1; r++) {
+    for (let c = 1; c < mazeCols - 1; c++) {
         if (mazeLayout[r][c] === 0) {
-            startX = c * wallSize;
-            startZ = r * wallSize;
-            break; // Found the first open spot
+            startPosWorld = gridToWorld(r, c);
+            break findStartPosition;
         }
     }
-    if (startX !== 1 * wallSize) break; // Exit outer loop too
 }
+camera.position.set(startPosWorld.x, playerHeight, startPosWorld.z);
+camera.rotation.order = 'YXZ';
+camera.rotation.y = 0; camera.rotation.x = 0;
 
-camera.position.set(startX, playerHeight, startZ);
-camera.rotation.order = 'YXZ'; // Set rotation order for smoother control
-camera.rotation.y = 0; // Start looking forward (positive Z if maze starts at origin)
+const chaserRadius = 0.8;
+const chaserSpeed = 3.5;
+const chaserGeometry = new THREE.SphereGeometry(chaserRadius, 16, 16);
+const chaserMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+const chaserMesh = new THREE.Mesh(chaserGeometry, chaserMaterial);
+chaserMesh.castShadow = true;
+const chaserCollider = new THREE.Sphere(undefined, chaserRadius);
 
-// --- Input Handling ---
+let chaserStartPosWorld = gridToWorld(mazeRows - 2, mazeCols - 2);
+if (mazeLayout[mazeRows - 2][mazeCols - 2 ] !== 0) {
+    findChaserStart:
+    for (let r = mazeRows - 2; r > 0; r--) {
+        for (let c = mazeCols - 2; c > 0; c--) {
+            if (mazeLayout[r][c] === 0) {
+                const currentStartPosGrid = worldToGrid(startPosWorld);
+                const distSq = (c - currentStartPosGrid.col)**2 + (r - currentStartPosGrid.row)**2;
+                if (distSq > 4**2) {
+                    chaserStartPosWorld = gridToWorld(r, c);
+                    break findChaserStart;
+                }
+            }
+        }
+    }
+}
+chaserMesh.position.set(chaserStartPosWorld.x, chaserRadius, chaserStartPosWorld.z);
+chaserCollider.center.copy(chaserMesh.position);
+scene.add(chaserMesh);
+
+let chaserPath = [];
+let currentPathIndex = 0;
+let timeSinceLastPathRecalc = 0;
+const pathRecalcInterval = 0.3;
+const directChaseDistanceThresholdSq = (wallSize * 1.75) * (wallSize * 1.75);
+const raycaster = new THREE.Raycaster();
+const chaserRayOrigin = new THREE.Vector3();
+const chaserRayDirection = new THREE.Vector3();
+
 const keyState = {};
 window.addEventListener('keydown', (event) => {
     keyState[event.code] = true;
-});
-window.addEventListener('keyup', (event) => {
-    keyState[event.code] = false;
-});
-
-// --- Collision Detection ---
-// Create a bounding box for the player
-const playerCollider = new THREE.Box3();
-const playerSize = new THREE.Vector3(playerWidth, playerHeight, playerWidth);
-
-function checkCollision(moveDirection) {
-    // Update the player's collider position for the *next* frame's potential position
-    const nextPosition = camera.position.clone().add(moveDirection);
-    playerCollider.setFromCenterAndSize(nextPosition, playerSize);
-
-    // Check collision with each wall
-    for (const wall of walls) {
-        const wallCollider = new THREE.Box3().setFromObject(wall);
-        if (playerCollider.intersectsBox(wallCollider)) {
-            return true; // Collision detected
-        }
+     if (event.code === 'Space' && onGround && !gameOver) {
+        playerVelocityY = jumpStrength;
+        onGround = false;
     }
-    return false; // No collision
+});
+window.addEventListener('keyup', (event) => { keyState[event.code] = false; });
+
+renderer.domElement.addEventListener('click', () => {
+    if (!isPointerLocked && !gameOver) renderer.domElement.requestPointerLock();
+});
+document.addEventListener('pointerlockchange', () => {
+    isPointerLocked = (document.pointerLockElement === renderer.domElement);
+    if (isPointerLocked) {
+        document.addEventListener('mousemove', onMouseMove, false);
+        instructionsDiv.style.display = 'none';
+    } else {
+        document.removeEventListener('mousemove', onMouseMove, false);
+        if (!gameOver) instructionsDiv.style.display = 'block';
+    }
+}, false);
+document.addEventListener('pointerlockerror', (e) => {
+    console.error('Pointer Lock Error', e); isPointerLocked = false;
+    document.removeEventListener('mousemove', onMouseMove, false);
+    if (!gameOver) instructionsDiv.style.display = 'block';
+}, false);
+
+function onMouseMove(event) {
+    if (!isPointerLocked || gameOver) return;
+    const movementX = event.movementX || 0; const movementY = event.movementY || 0;
+    camera.rotation.y -= movementX * mouseSensitivity;
+    camera.rotation.x -= movementY * mouseSensitivity;
+    camera.rotation.x = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, camera.rotation.x));
 }
 
-// --- Animation Loop ---
+const playerCollider = new THREE.Box3();
+const playerWidth = playerRadius * 2;
+const playerVisualHeight = 1.7; // Approximate visual height for collider check
+const playerSizeVec = new THREE.Vector3(playerWidth, playerVisualHeight, playerWidth);
+
+function checkPlayerWallCollision(moveDirection) {
+    const checkPosition = camera.position.clone().add(moveDirection.clone().multiplyScalar(1.1));
+    checkPosition.y -= playerHeight - (playerVisualHeight / 2) ;// Center the box vertically around player's visual center
+    playerCollider.setFromCenterAndSize(checkPosition, playerSizeVec);
+
+    for (const wallBox of wallBoxes) {
+        if (playerCollider.intersectsBox(wallBox)) return true;
+    }
+    return false;
+}
+
+function checkChaserWallCollisionWithMove(currentPos, moveVec) {
+    const nextPos = currentPos.clone().add(moveVec);
+    chaserCollider.center.copy(nextPos);
+    chaserCollider.center.y = chaserRadius;
+    for (const wallBox of wallBoxes) {
+        if (chaserCollider.intersectsBox(wallBox)) return true;
+    }
+    return false;
+}
+
+function gridToWorld(row, col) {
+    return new THREE.Vector3(col * wallSize, 0, row * wallSize);
+}
+function worldToGrid(worldPos) {
+    return { row: Math.round(worldPos.z / wallSize), col: Math.round(worldPos.x / wallSize) };
+}
+
+class PathNode {
+    constructor(row, col, g = Infinity, h = 0, parent = null) {
+        this.row = row; this.col = col; this.g = g; this.h = h;
+        this.f = g + h; this.parent = parent;
+    }
+ }
+function heuristic(nodeA, nodeB) {
+    return Math.abs(nodeA.row - nodeB.row) + Math.abs(nodeA.col - nodeB.col);
+}
+function findPath(startWorldPos, endWorldPos) {
+    const startGrid = worldToGrid(startWorldPos);
+    const endGrid = worldToGrid(endWorldPos);
+    if (startGrid.row === endGrid.row && startGrid.col === endGrid.col) return [];
+    const startRowValid = startGrid.row >= 0 && startGrid.row < mazeRows;
+    const startColValid = startGrid.col >= 0 && startGrid.col < mazeCols;
+    const endRowValid = endGrid.row >= 0 && endGrid.row < mazeRows;
+    const endColValid = endGrid.col >= 0 && endGrid.col < mazeCols;
+    if (!startRowValid || !startColValid || mazeLayout[startGrid.row][startGrid.col] === 1 ||
+        !endRowValid   || !endColValid   || mazeLayout[endGrid.row][endGrid.col] === 1) return [];
+
+    const openSet = new Map(); const closedSet = new Set();
+    const startNode = new PathNode(startGrid.row, startGrid.col, 0);
+    startNode.h = heuristic(startNode, endGrid); startNode.f = startNode.g + startNode.h;
+    const startKey = `${startGrid.row},${startGrid.col}`; openSet.set(startKey, startNode);
+
+    while (openSet.size > 0) {
+        let lowestF = Infinity; let currentKey = null; let currentNode = null;
+        for (const [key, node] of openSet) { if (node.f < lowestF) { lowestF = node.f; currentKey = key; currentNode = node; } }
+        if (currentNode.row === endGrid.row && currentNode.col === endGrid.col) {
+            const path = []; let temp = currentNode;
+            while (temp) { path.push(gridToWorld(temp.row, temp.col)); temp = temp.parent; } return path.reverse();
+        }
+        openSet.delete(currentKey); closedSet.add(currentKey);
+        const neighbors = [ { dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 } ];
+        for (const move of neighbors) {
+            const nRow = currentNode.row + move.dr; const nCol = currentNode.col + move.dc;
+            const nKey = `${nRow},${nCol}`;
+            if (nRow < 0 || nRow >= mazeRows || nCol < 0 || nCol >= mazeCols) continue;
+            if (mazeLayout[nRow][nCol] === 1) continue; if (closedSet.has(nKey)) continue;
+            const tentativeG = currentNode.g + 1; let nNode = openSet.get(nKey);
+            if (!nNode || tentativeG < nNode.g) {
+                if (!nNode) nNode = new PathNode(nRow, nCol);
+                nNode.parent = currentNode; nNode.g = tentativeG; nNode.h = heuristic(nNode, endGrid);
+                nNode.f = nNode.g + nNode.h; if (!openSet.has(nKey)) openSet.set(nKey, nNode);
+            }
+        }
+    } return [];
+}
+
+function hasLineOfSight(startPos, endPos) {
+    chaserRayOrigin.copy(startPos); chaserRayOrigin.y = chaserRadius;
+    chaserRayDirection.copy(endPos).sub(startPos);
+    const distance = chaserRayDirection.length(); chaserRayDirection.normalize();
+    raycaster.set(chaserRayOrigin, chaserRayDirection); raycaster.far = distance;
+    const intersects = raycaster.intersectObjects(wallMeshes); return intersects.length === 0;
+}
+
+function triggerGameOver() {
+    if (gameOver) return; gameOver = true;
+    gameOverScreen.style.display = 'flex'; instructionsDiv.style.display = 'none';
+    if (isPointerLocked) document.exitPointerLock();
+}
+restartButton.addEventListener('click', () => window.location.reload());
+
 const clock = new THREE.Clock();
+const forward = new THREE.Vector3();
+const right = new THREE.Vector3();
+const playerMoveDirection = new THREE.Vector3();
+const chaserTargetPoint = new THREE.Vector3();
+const chaserDirectionTarget = new THREE.Vector3();
+const chaserMoveDir = new THREE.Vector3();
+const targetReachedThresholdSq = 0.6 * 0.6;
+const tempChaserPos = new THREE.Vector3();
+const tempPlayerPos = new THREE.Vector3();
 
 function animate() {
     requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    timeSinceLastPathRecalc += delta;
 
-    const delta = clock.getDelta(); // Time since last frame
+    if (!gameOver) {
+        // --- Handle Player Horizontal Movement ---
+        playerMoveDirection.set(0, 0, 0);
+        const moveDistance = moveSpeed * delta;
+        camera.getWorldDirection(forward); forward.y = 0; forward.normalize();
+        right.crossVectors(forward, camera.up);
+        if (keyState['KeyW']) playerMoveDirection.add(forward.clone().multiplyScalar(moveDistance));
+        if (keyState['KeyS']) playerMoveDirection.add(forward.clone().multiplyScalar(-moveDistance));
+        if (keyState['KeyA']) playerMoveDirection.add(right.clone().multiplyScalar(-moveDistance));
+        if (keyState['KeyD']) playerMoveDirection.add(right.clone().multiplyScalar(moveDistance));
 
-    // --- Calculate Movement ---
-    const moveDirection = new THREE.Vector3(0, 0, 0);
-    const moveDistance = moveSpeed * delta;
-    const turnDistance = turnSpeed * delta;
+        const combinedMove = playerMoveDirection.clone();
+        if (combinedMove.lengthSq() > 0) {
+            if (!checkPlayerWallCollision(combinedMove)) {
+                camera.position.add(combinedMove);
+            } else {
+                const moveX = new THREE.Vector3(combinedMove.x, 0, 0);
+                const moveZ = new THREE.Vector3(0, 0, combinedMove.z);
+                if (moveX.lengthSq() > 0 && !checkPlayerWallCollision(moveX)) camera.position.add(moveX);
+                if (moveZ.lengthSq() > 0 && !checkPlayerWallCollision(moveZ)) camera.position.add(moveZ);
+            }
+        }
 
-    // Rotation (Turning)
-    if (keyState['ArrowLeft'] || keyState['KeyA']) {
-        camera.rotation.y += turnDistance;
+        // --- Handle Player Vertical Movement (Jump/Gravity) ---
+        playerVelocityY -= gravity * delta;
+        camera.position.y += playerVelocityY * delta;
+
+        if (camera.position.y <= playerHeight) {
+            camera.position.y = playerHeight;
+            playerVelocityY = 0;
+            onGround = true;
+        } else {
+            onGround = false;
+        }
+
+    } // --- End Player Movement ---
+
+
+    if (!gameOver) {
+        // --- Chaser Pathfinding & Movement ---
+        tempChaserPos.copy(chaserMesh.position);
+        tempPlayerPos.copy(camera.position);
+        const distanceToPlayerSq = tempChaserPos.distanceToSquared(tempPlayerPos);
+        let useDirectChase = false; let forcePathRecalc = false;
+
+        if (distanceToPlayerSq < directChaseDistanceThresholdSq) {
+            if (hasLineOfSight(tempChaserPos, tempPlayerPos)) {
+                useDirectChase = true; if (chaserPath.length > 0) { chaserPath = []; currentPathIndex = 0; }
+            } else { if(timeSinceLastPathRecalc > pathRecalcInterval * 0.5) { forcePathRecalc = true; } }
+        }
+
+        chaserMoveDir.set(0,0,0);
+        if (useDirectChase) {
+            chaserMoveDir.copy(tempPlayerPos).sub(tempChaserPos); chaserMoveDir.y = 0;
+        } else {
+             if (forcePathRecalc || timeSinceLastPathRecalc > pathRecalcInterval || chaserPath.length === 0 && distanceToPlayerSq > targetReachedThresholdSq) {
+                 chaserPath = findPath(tempChaserPos, tempPlayerPos); currentPathIndex = 0;
+                 if (chaserPath.length > 1) { const dSq = tempChaserPos.distanceToSquared(chaserPath[0]);
+                     if (dSq < (wallSize*0.4)**2 ) { currentPathIndex = 1; }
+                 } timeSinceLastPathRecalc = 0;
+             }
+             if (chaserPath.length > 0 && currentPathIndex < chaserPath.length) {
+                 chaserTargetPoint.copy(chaserPath[currentPathIndex]); chaserTargetPoint.y = chaserRadius;
+                 const lookaheadIndex = Math.min(currentPathIndex + 1, chaserPath.length - 1);
+                 chaserDirectionTarget.copy(chaserPath[lookaheadIndex]); chaserDirectionTarget.y = chaserRadius;
+                 chaserMoveDir.copy(chaserDirectionTarget).sub(tempChaserPos); chaserMoveDir.y = 0;
+                 tempChaserPos.y = chaserRadius;
+                 const distToArrivalNodeSq = tempChaserPos.distanceToSquared(chaserTargetPoint);
+                 if (distToArrivalNodeSq < targetReachedThresholdSq) {
+                     currentPathIndex++; if (currentPathIndex >= chaserPath.length) { chaserPath = []; chaserMoveDir.set(0,0,0);}
+                 }
+             }
+        }
+
+        if(chaserMoveDir.lengthSq() > 0.0001) { chaserMoveDir.normalize(); }
+
+        if(chaserMoveDir.lengthSq() > 0.0001) {
+            const chaserFrameSpeed = chaserSpeed * delta;
+            const moveAmount = chaserMoveDir.clone().multiplyScalar(chaserFrameSpeed);
+            if (!checkChaserWallCollisionWithMove(chaserMesh.position, moveAmount)) {
+                chaserMesh.position.add(moveAmount);
+            } else {
+                 const moveX = new THREE.Vector3(moveAmount.x, 0, 0); const moveZ = new THREE.Vector3(0, 0, moveAmount.z);
+                 tempChaserPos.copy(chaserMesh.position);
+                 if (moveX.lengthSq() > 0 && !checkChaserWallCollisionWithMove(tempChaserPos, moveX)) { chaserMesh.position.add(moveX); tempChaserPos.add(moveX); }
+                 if (moveZ.lengthSq() > 0 && !checkChaserWallCollisionWithMove(tempChaserPos, moveZ)) { chaserMesh.position.add(moveZ); }
+            }
+             chaserCollider.center.copy(chaserMesh.position);
+        } else { chaserCollider.center.copy(chaserMesh.position); }
+    } // --- End Chaser Movement ---
+
+    if (!gameOver) {
+        // --- Player-Chaser Collision Check ---
+        const distanceSq = camera.position.distanceToSquared(chaserMesh.position);
+        const collisionThreshold = playerRadius + chaserRadius;
+        const collisionThresholdSq = collisionThreshold * collisionThreshold;
+        if (distanceSq < collisionThresholdSq) { triggerGameOver(); }
     }
-    if (keyState['ArrowRight'] || keyState['KeyD']) {
-        camera.rotation.y -= turnDistance;
-    }
 
-    // Forward/Backward Movement (relative to camera direction)
-    if (keyState['ArrowUp'] || keyState['KeyW']) {
-        const forward = new THREE.Vector3();
-        camera.getWorldDirection(forward);
-        moveDirection.add(forward.multiplyScalar(moveDistance));
-    }
-    if (keyState['ArrowDown'] || keyState['KeyS']) {
-        const backward = new THREE.Vector3();
-        camera.getWorldDirection(backward);
-        moveDirection.add(backward.multiplyScalar(-moveDistance)); // Move opposite direction
-    }
-
-    // --- Apply Movement with Collision Check ---
-    // Check X/Z movement separately to allow sliding along walls
-    const moveX = new THREE.Vector3(moveDirection.x, 0, 0);
-    const moveZ = new THREE.Vector3(0, 0, moveDirection.z);
-
-    if (!checkCollision(moveX)) {
-        camera.position.add(moveX);
-    }
-    if (!checkCollision(moveZ)) {
-        camera.position.add(moveZ);
-    }
-
-
-    // --- Render ---
     renderer.render(scene, camera);
 }
 
-// --- Handle Window Resize ---
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
-// Start the animation loop
 animate();

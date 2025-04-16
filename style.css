@@ -1,13 +1,13 @@
 body {
     margin: 0;
-    overflow: hidden; /* Prevent scrollbars */
+    overflow: hidden;
     background-color: #333;
     color: white;
     font-family: sans-serif;
 }
 
 canvas {
-    display: block; /* Remove annoying space below canvas */
+    display: block;
 }
 
 #instructions {
@@ -17,5 +17,43 @@ canvas {
     background-color: rgba(0, 0, 0, 0.5);
     padding: 10px;
     border-radius: 5px;
-    z-index: 10; /* Ensure it's above the canvas */
+    z-index: 10;
+}
+
+#gameOverScreen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(200, 0, 0, 0.8);
+    padding: 40px;
+    border-radius: 10px;
+    text-align: center;
+    z-index: 20;
+    color: white;
+    border: 3px solid white;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+}
+
+#gameOverScreen h1 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 3em;
+}
+
+#restartButton {
+    padding: 10px 20px;
+    font-size: 1.2em;
+    cursor: pointer;
+    background-color: white;
+    color: #c80000;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+#restartButton:hover {
+    background-color: #eee;
 }

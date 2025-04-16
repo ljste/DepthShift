@@ -3,20 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple 3D Maze - Three.js</title>
+    <title>DepthShift</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Instructions -->
     <div id="instructions">
-        Use WASD or Arrow Keys to move.<br>
-        Use Left/Right Arrow Keys (or A/D) also for turning.
+        Click the screen to lock mouse for looking.<br>
+        Use WASD keys to move. SPACE to Jump.<br>
+        Press ESC to unlock mouse.<br>
+        <span style="color: red;">Avoid the red ball!</span>
     </div>
 
-    <!-- Three.js library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.139.2/three.min.js"></script>
+    <div id="gameOverScreen" style="display: none;">
+        <h1>Game Over!</h1>
+        <button id="restartButton">Restart</button>
+    </div>
 
-    <!-- Your game script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.139.2/three.min.js"></script>
     <script type="module" src="script.js"></script>
 </body>
 </html>
