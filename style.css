@@ -10,7 +10,7 @@ canvas {
     display: block;
 }
 
-#startScreen, #pauseScreen {
+#startScreen, #pauseScreen, #characterSelectScreen {
     position: absolute;
     top: 0;
     left: 0;
@@ -28,7 +28,7 @@ canvas {
     transition: opacity 0.5s ease-out;
 }
 
-#startScreen.hidden, #pauseScreen.hidden {
+#startScreen.hidden, #pauseScreen.hidden, #characterSelectScreen.hidden {
     opacity: 0;
     pointer-events: none;
 }
@@ -46,18 +46,89 @@ canvas {
     color: #cccccc;
 }
 
+#characterSelectScreen {
+    z-index: 28;
+    display: none;
+    opacity: 0;
+}
+
+#characterSelectScreen.visible {
+     display: flex;
+     opacity: 1;
+     pointer-events: auto;
+}
+
+
+#characterSelectScreen h2 {
+    font-size: 3em;
+    margin-bottom: 40px;
+    color: #ffffff;
+    text-shadow: 1px 1px 6px rgba(0, 0, 0, 0.4);
+}
+
+.character-options {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+}
+
+.character-option {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    padding: 25px;
+    width: 200px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.character-option:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.character-option h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1.6em;
+    color: #ffae00;
+}
+
+.character-option p {
+    font-size: 1em;
+    margin-bottom: 20px;
+    color: #dddddd;
+    min-height: 40px;
+}
+
+.character-option .selectButton {
+    padding: 10px 20px;
+    font-size: 1.1em;
+    cursor: pointer;
+    background-color: #ff8c00;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+.character-option .selectButton:hover {
+    background-color: #cc7000;
+}
+
+
 #pauseScreen {
-    z-index: 25; /* Below startScreen */
+    z-index: 25;
     display: none;
     opacity: 0;
     background: rgba(0, 0, 0, 0.75);
-    cursor: pointer; /* Indicate it's clickable */
+    cursor: pointer;
 }
 
 #pauseScreen.visible {
     display: flex;
     opacity: 1;
-    pointer-events: auto; /* Make it clickable when visible */
+    pointer-events: auto;
 }
 
 

@@ -5,6 +5,7 @@ let gameOver = false;
 let isPaused = false;
 const startScreen = document.getElementById('startScreen');
 const startButton = document.getElementById('startButton');
+const characterSelectScreen = document.getElementById('characterSelectScreen');
 const pauseScreen = document.getElementById('pauseScreen');
 const gameOverScreen = document.getElementById('gameOverScreen');
 const restartButton = document.getElementById('restartButton');
@@ -81,12 +82,19 @@ scene.add(floorMesh);
 
 const playerHeight = wallHeight * 0.6;
 const playerRadius = 0.4;
-const moveSpeed = 5.0;
 const mouseSensitivity = 0.002;
 const gravity = 20.0;
-const jumpStrength = 5.0;
 let playerVelocityY = 0;
 let onGround = true;
+
+let selectedMoveSpeed = 5.0;
+let selectedJumpStrength = 5.0;
+const characterStats = {
+    average: { speed: 5.0, jump: 5.0 },
+    speedster: { speed: 6.5, jump: 4.0 },
+    jumper: { speed: 4.0, jump: 6.5 },
+};
+
 
 let startPosWorld = gridToWorld(1, 1);
 findStartPosition:
@@ -143,7 +151,7 @@ const keyState = {};
 window.addEventListener('keydown', (event) => {
     keyState[event.code] = true;
      if (event.code === 'Space' && onGround && !gameOver && gameStarted && !isPaused) {
-        playerVelocityY = jumpStrength;
+        playerVelocityY = selectedJumpStrength;
         onGround = false;
     }
      if (event.code === 'Escape' && isPointerLocked && gameStarted && !gameOver) {
@@ -154,7 +162,21 @@ window.addEventListener('keyup', (event) => { keyState[event.code] = false; });
 
 startButton.addEventListener('click', () => {
     startScreen.classList.add('hidden');
-    setTimeout(() => { startScreen.style.display = 'none'; }, 500);
+    setTimeout(() => {
+        startScreen.style.display = 'none';
+        characterSelectScreen.classList.add('visible');
+        characterSelectScreen.style.display = 'flex';
+    }, 500);
+});
+
+function startGame(characterType) {
+    selectedMoveSpeed = characterStats[characterType].speed;
+    selectedJumpStrength = characterStats[characterType].jump;
+
+    characterSelectScreen.classList.remove('visible');
+    characterSelectScreen.classList.add('hidden');
+    setTimeout(() => { characterSelectScreen.style.display = 'none'; }, 500);
+
     gameStarted = true;
     isPaused = false;
     gameOver = false;
@@ -165,7 +187,16 @@ startButton.addEventListener('click', () => {
     if (!isPointerLocked) {
         renderer.domElement.requestPointerLock();
     }
+}
+
+document.querySelectorAll('.character-option .selectButton').forEach(button => {
+    button.addEventListener('click', (event) => {
+        const optionDiv = event.target.closest('.character-option');
+        const characterType = optionDiv.dataset.character;
+        startGame(characterType);
+    });
 });
+
 
 renderer.domElement.addEventListener('click', () => {
     if (!isPointerLocked && gameStarted && !gameOver && !isPaused) {
@@ -364,7 +395,7 @@ function animate() {
     timeSinceLastPathRecalc += delta;
 
     playerMoveDirection.set(0, 0, 0);
-    const moveDistance = moveSpeed * delta;
+    const moveDistance = selectedMoveSpeed * delta;
     camera.getWorldDirection(forward); forward.y = 0; forward.normalize();
     right.crossVectors(forward, camera.up);
     if (keyState['KeyW']) playerMoveDirection.add(forward.clone().multiplyScalar(moveDistance));
