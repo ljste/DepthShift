@@ -10,24 +10,21 @@ canvas {
     display: block;
 }
 
-/* Define the animated gradient */
 @keyframes gradientAnimation {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
 }
 
-#startScreen, #pauseScreen, #characterSelectScreen {
+#startScreen, #pauseScreen, #characterSelectScreen, #gameWonScreen {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    /* Animated Gradient Background */
     background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
     background-size: 400% 400%;
     animation: gradientAnimation 15s ease infinite;
-    /* Keep other styles */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -39,22 +36,23 @@ canvas {
     transition: opacity 0.5s ease-out;
 }
 
-#startScreen.hidden, #pauseScreen.hidden, #characterSelectScreen.hidden {
+#startScreen.hidden, #pauseScreen.hidden, #characterSelectScreen.hidden, #gameWonScreen.hidden {
     opacity: 0;
     pointer-events: none;
 }
+
 
 #startScreen h1 {
     font-size: 4.5em;
     margin-bottom: 10px;
     color: #ffffff;
-    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7); /* Darker shadow for contrast */
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
 }
 
 #startScreen p {
     font-size: 1.5em;
     margin-bottom: 40px;
-    color: #ffffff; /* Brighter text */
+    color: #ffffff;
     text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.6);
 }
 
@@ -62,7 +60,6 @@ canvas {
     z-index: 28;
     display: none;
     opacity: 0;
-    /* Inherits animated background */
 }
 
 #characterSelectScreen.visible {
@@ -83,17 +80,17 @@ canvas {
     display: flex;
     justify-content: center;
     gap: 40px;
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    flex-wrap: wrap;
 }
 
 .character-option {
-    background-color: rgba(0, 0, 0, 0.4); /* Darker semi-transparent background */
-    border: 2px solid rgba(255, 255, 255, 0.5); /* Brighter border */
+    background-color: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.5);
     border-radius: 10px;
     padding: 25px;
     width: 200px;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); /* Slightly stronger shadow */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
 }
 
 .character-option:hover {
@@ -106,14 +103,14 @@ canvas {
     margin-top: 0;
     margin-bottom: 10px;
     font-size: 1.6em;
-    color: #ffffff; /* White title */
+    color: #ffffff;
      text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .character-option p {
     font-size: 1em;
     margin-bottom: 20px;
-    color: #f0f0f0; /* Lighter paragraph text */
+    color: #f0f0f0;
     min-height: 40px;
 }
 
@@ -143,9 +140,6 @@ canvas {
     z-index: 25;
     display: none;
     opacity: 0;
-    /* Inherits animated background */
-    /* Remove specific background override */
-    /* background: rgba(0, 0, 0, 0.75); */
     cursor: pointer;
 }
 
@@ -165,7 +159,7 @@ canvas {
 
 #pauseScreen p {
     font-size: 1.3em;
-    color: #f0f0f0; /* Lighter text */
+    color: #f0f0f0;
      text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
 }
 
@@ -180,7 +174,7 @@ canvas {
     border-radius: 8px;
     font-weight: bold;
     transition: background-color 0.3s ease, transform 0.1s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); /* Adjusted shadow */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }
 
 #startButton:hover {
@@ -196,11 +190,24 @@ canvas {
 .start-instructions {
     margin-top: 50px;
     font-size: 1em;
-    color: #ffffff; /* Brighter instructions */
+    color: #ffffff;
     line-height: 1.6;
      text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
 }
 
+
+#levelIndicator {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 10px 15px;
+    border-radius: 5px;
+    z-index: 10;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #eee;
+}
 
 #instructions {
     position: absolute;
@@ -221,7 +228,7 @@ canvas {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgba(150, 0, 0, 0.9); /* Darker red */
+    background-color: rgba(150, 0, 0, 0.9);
     padding: 50px;
     border-radius: 15px;
     text-align: center;
@@ -238,26 +245,54 @@ canvas {
     margin-top: 0;
     margin-bottom: 30px;
     font-size: 3.5em;
-    text-shadow: 1px 1px 5px rgba(0,0,0,0.5); /* Stronger shadow */
+    text-shadow: 1px 1px 5px rgba(0,0,0,0.5);
 }
 
-#restartButton {
+#restartButton, #playAgainButton {
     padding: 12px 25px;
     font-size: 1.3em;
     cursor: pointer;
     background-color: white;
-    color: #960000; /* Match darker red */
+    color: #333;
     border: none;
     border-radius: 6px;
     font-weight: bold;
     transition: background-color 0.2s ease, transform 0.1s ease;
+    margin-top: 10px;
 }
 
-#restartButton:hover {
+#restartButton:hover, #playAgainButton:hover {
     background-color: #f0f0f0;
     transform: scale(1.05);
 }
 
-#restartButton:active {
+#restartButton:active, #playAgainButton:active {
     transform: scale(1.02);
+}
+
+#gameOverScreen #restartButton {
+     color: #960000;
+}
+
+
+#gameWonScreen {
+    z-index: 20;
+    display: none;
+}
+
+#gameWonScreen h1 {
+    font-size: 4em;
+    margin-bottom: 20px;
+    color: #ffffff;
+    text-shadow: 1px 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+#gameWonScreen p {
+    font-size: 1.5em;
+    margin-bottom: 30px;
+    color: #f0f0f0;
+     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+}
+#gameWonScreen #playAgainButton {
+    color: #23a6d5;
 }

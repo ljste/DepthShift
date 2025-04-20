@@ -9,7 +9,7 @@
 <body>
     <div id="startScreen">
         <h1>DepthShift</h1>
-        <p>Escape the Maze. Avoid the Red Chaser.</p>
+        <p>Escape the Mazes. Avoid the Red Chaser.</p>
         <button id="startButton">Start Game</button>
         <div class="start-instructions">
             Use WASD to Move<br>
@@ -40,20 +40,27 @@
         </div>
     </div>
 
-
     <div id="pauseScreen">
         <h1>Paused</h1>
         <p>Click the screen to resume</p>
     </div>
 
+    <div id="levelIndicator">Level: <span id="levelNumber">1</span></div>
+
     <div id="instructions">
         WASD: Move | SPACE: Jump | Mouse: Look<br>
-        ESC to Pause/Unlock Mouse | <span style="color: red;">Avoid the red ball!</span>
+        ESC to Pause/Unlock Mouse | <span style="color: red;">Avoid the red ball!</span> | <span style="color: lime;">Find the green plate!</span>
     </div>
 
     <div id="gameOverScreen">
         <h1>Game Over!</h1>
         <button id="restartButton">Restart</button>
+    </div>
+
+    <div id="gameWonScreen">
+        <h1>Congratulations!</h1>
+        <p>You escaped all the mazes!</p>
+        <button id="playAgainButton">Play Again</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.139.2/three.min.js"></script>
