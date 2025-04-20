@@ -10,13 +10,24 @@ canvas {
     display: block;
 }
 
+/* Define the animated gradient */
+@keyframes gradientAnimation {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
 #startScreen, #pauseScreen, #characterSelectScreen {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.9)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><path fill="%23333" d="M10 10 H 90 V 90 H 10 Z M 0 0 H 100 V 100 H 0 Z" fill-opacity="0.05" /></svg>');
+    /* Animated Gradient Background */
+    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+    background-size: 400% 400%;
+    animation: gradientAnimation 15s ease infinite;
+    /* Keep other styles */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -37,19 +48,21 @@ canvas {
     font-size: 4.5em;
     margin-bottom: 10px;
     color: #ffffff;
-    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7); /* Darker shadow for contrast */
 }
 
 #startScreen p {
     font-size: 1.5em;
     margin-bottom: 40px;
-    color: #cccccc;
+    color: #ffffff; /* Brighter text */
+    text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.6);
 }
 
 #characterSelectScreen {
     z-index: 28;
     display: none;
     opacity: 0;
+    /* Inherits animated background */
 }
 
 #characterSelectScreen.visible {
@@ -63,40 +76,44 @@ canvas {
     font-size: 3em;
     margin-bottom: 40px;
     color: #ffffff;
-    text-shadow: 1px 1px 6px rgba(0, 0, 0, 0.4);
+    text-shadow: 1px 1px 6px rgba(0, 0, 0, 0.6);
 }
 
 .character-options {
     display: flex;
     justify-content: center;
     gap: 40px;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
 }
 
 .character-option {
-    background-color: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    background-color: rgba(0, 0, 0, 0.4); /* Darker semi-transparent background */
+    border: 2px solid rgba(255, 255, 255, 0.5); /* Brighter border */
     border-radius: 10px;
     padding: 25px;
     width: 200px;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); /* Slightly stronger shadow */
 }
 
 .character-option:hover {
     transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.8);
 }
 
 .character-option h3 {
     margin-top: 0;
     margin-bottom: 10px;
     font-size: 1.6em;
-    color: #ffae00;
+    color: #ffffff; /* White title */
+     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .character-option p {
     font-size: 1em;
     margin-bottom: 20px;
-    color: #dddddd;
+    color: #f0f0f0; /* Lighter paragraph text */
     min-height: 40px;
 }
 
@@ -109,11 +126,16 @@ canvas {
     border: none;
     border-radius: 5px;
     font-weight: bold;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.3s ease, transform 0.1s ease;
 }
 
 .character-option .selectButton:hover {
     background-color: #cc7000;
+    transform: scale(1.03);
+}
+
+.character-option .selectButton:active {
+    transform: scale(1.00);
 }
 
 
@@ -121,7 +143,9 @@ canvas {
     z-index: 25;
     display: none;
     opacity: 0;
-    background: rgba(0, 0, 0, 0.75);
+    /* Inherits animated background */
+    /* Remove specific background override */
+    /* background: rgba(0, 0, 0, 0.75); */
     cursor: pointer;
 }
 
@@ -136,12 +160,13 @@ canvas {
     font-size: 4em;
     margin-bottom: 20px;
     color: #ffffff;
-    text-shadow: 1px 1px 6px rgba(0, 0, 0, 0.4);
+    text-shadow: 1px 1px 6px rgba(0, 0, 0, 0.6);
 }
 
 #pauseScreen p {
     font-size: 1.3em;
-    color: #bbbbbb;
+    color: #f0f0f0; /* Lighter text */
+     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 
@@ -155,12 +180,13 @@ canvas {
     border-radius: 8px;
     font-weight: bold;
     transition: background-color 0.3s ease, transform 0.1s ease;
-    box-shadow: 0 4px 15px rgba(255, 69, 0, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); /* Adjusted shadow */
 }
 
 #startButton:hover {
     background-color: #e03e00;
     transform: scale(1.05);
+     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 #startButton:active {
@@ -170,8 +196,9 @@ canvas {
 .start-instructions {
     margin-top: 50px;
     font-size: 1em;
-    color: #aaaaaa;
+    color: #ffffff; /* Brighter instructions */
     line-height: 1.6;
+     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 
@@ -194,7 +221,7 @@ canvas {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgba(200, 0, 0, 0.85);
+    background-color: rgba(150, 0, 0, 0.9); /* Darker red */
     padding: 50px;
     border-radius: 15px;
     text-align: center;
@@ -211,7 +238,7 @@ canvas {
     margin-top: 0;
     margin-bottom: 30px;
     font-size: 3.5em;
-    text-shadow: 1px 1px 5px rgba(0,0,0,0.3);
+    text-shadow: 1px 1px 5px rgba(0,0,0,0.5); /* Stronger shadow */
 }
 
 #restartButton {
@@ -219,13 +246,18 @@ canvas {
     font-size: 1.3em;
     cursor: pointer;
     background-color: white;
-    color: #c80000;
+    color: #960000; /* Match darker red */
     border: none;
     border-radius: 6px;
     font-weight: bold;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
 #restartButton:hover {
     background-color: #f0f0f0;
+    transform: scale(1.05);
+}
+
+#restartButton:active {
+    transform: scale(1.02);
 }
