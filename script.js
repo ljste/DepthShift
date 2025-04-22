@@ -49,19 +49,11 @@ scene.add(directionalLight);
 const textureLoader = new THREE.TextureLoader();
 const grassTexture = textureLoader.load('textures/grass.jpg');
 const stoneTexture = textureLoader.load('textures/stone.jpg');
-// Texture loader call for win plate texture can be removed or ignored if using MeshBasicMaterial color
-// const winPlateTexture = textureLoader.load('textures/win_plate.png');
 
 grassTexture.wrapS = THREE.RepeatWrapping;
 grassTexture.wrapT = THREE.RepeatWrapping;
 stoneTexture.wrapS = THREE.RepeatWrapping;
 stoneTexture.wrapT = THREE.RepeatWrapping;
-// No need for texture setup if using basic color
-// if (winPlateTexture) {
-//     winPlateTexture.wrapS = THREE.RepeatWrapping;
-//     winPlateTexture.wrapT = THREE.RepeatWrapping;
-//     winPlateTexture.repeat.set(0.5, 0.5);
-// }
 
 const cubeTextureLoader = new THREE.CubeTextureLoader();
 const skyboxTexture = cubeTextureLoader
@@ -76,18 +68,39 @@ scene.background = skyboxTexture;
 const wallSize = 5;
 const wallHeight = 5;
 let mazeRows, mazeCols;
+let mazeWidth, mazeDepth;
+let mazeCenterX, mazeCenterZ;
 const walls = [];
 const wallBoxes = [];
 const wallMeshes = [];
+const hintTiles = [];
+const hintTileBoxes = [];
 
 let floorMesh;
 let winPlateMesh;
 let winPlateBox;
 
+let hintCamera;
+let isShowingHint = false;
+let hintStartTime = 0;
+const hintDuration = 4.0;
+let originalCameraPosition = new THREE.Vector3();
+let originalCameraRotation = new THREE.Euler();
+let playerMarkerMesh = null;
+const playerMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.8 });
+const playerMarkerGeometry = new THREE.SphereGeometry(0.5, 16, 8);
+
+let hintCamStartPos = new THREE.Vector3();
+let hintCamEndPos = new THREE.Vector3();
+let hintCamStartLookAt = new THREE.Vector3();
+let hintCamEndLookAt = new THREE.Vector3();
+let hintCamCurrentLookAt = new THREE.Vector3();
+
+
 const mazeLayouts = [
     [
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 3, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+        [1, 3, 0, 0, 1, 0, 0, 0, 5, 0, 0, 1],
         [1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1],
         [1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1],
         [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1],
@@ -103,7 +116,7 @@ const mazeLayouts = [
         [1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1],
         [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
         [1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1],
-        [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 1, 5, 0, 1, 1, 0, 1, 0, 1],
         [1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1],
         [1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1],
         [1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1],
@@ -126,7 +139,7 @@ const mazeLayouts = [
         [1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1],
         [1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
         [1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1],
-        [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+        [1, 5, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1],
         [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1],
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -136,21 +149,31 @@ let currentLevel = 0;
 
 const wallMaterial = new THREE.MeshStandardMaterial({ map: stoneTexture });
 const floorMaterial = new THREE.MeshStandardMaterial({ map: grassTexture, side: THREE.DoubleSide });
-// *** CHANGED MATERIAL HERE ***
 const winPlateMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+const hintTileMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
 
 const wallGeometry = new THREE.BoxGeometry(wallSize, wallHeight, wallSize);
 const winPlateGeometry = new THREE.CylinderGeometry(wallSize * 0.4, wallSize * 0.4, 0.2, 32);
+const hintTileGeometry = new THREE.CylinderGeometry(wallSize * 0.35, wallSize * 0.35, 0.2, 32);
 
 camera.rotation.order = 'YXZ';
 
 function setupLevel(levelIndex) {
     walls.length = 0;
     wallBoxes.length = 0;
+    hintTiles.length = 0;
+    hintTileBoxes.length = 0;
     wallMeshes.forEach(mesh => scene.remove(mesh));
     wallMeshes.length = 0;
     if (floorMesh) scene.remove(floorMesh);
     if (winPlateMesh) scene.remove(winPlateMesh);
+    hintTiles.forEach(tile => scene.remove(tile.mesh));
+    if (playerMarkerMesh) {
+        scene.remove(playerMarkerMesh);
+        playerMarkerMesh = null;
+    }
+
+    isShowingHint = false;
 
     const currentLayout = mazeLayouts[levelIndex];
     mazeRows = currentLayout.length;
@@ -158,6 +181,11 @@ function setupLevel(levelIndex) {
     let playerStartPos = null;
     let chaserStartPos = null;
     let winPos = null;
+
+    mazeWidth = mazeCols * wallSize;
+    mazeDepth = mazeRows * wallSize;
+    mazeCenterX = (mazeCols / 2) * wallSize - wallSize / 2;
+    mazeCenterZ = (mazeRows / 2) * wallSize - wallSize / 2;
 
     for (let row = 0; row < mazeRows; row++) {
         for (let col = 0; col < mazeCols; col++) {
@@ -184,27 +212,36 @@ function setupLevel(levelIndex) {
                 case 4:
                     chaserStartPos = worldPos;
                     break;
+                case 5:
+                    const hintTileMesh = new THREE.Mesh(hintTileGeometry, hintTileMaterial);
+                    hintTileMesh.position.set(worldPos.x, 0.1, worldPos.z);
+                    hintTileMesh.receiveShadow = false;
+                    hintTileMesh.castShadow = false;
+                    scene.add(hintTileMesh);
+                    const hintTileBox = new THREE.Box3().setFromObject(hintTileMesh);
+                    hintTileBox.expandByScalar(0.1);
+                    const hintTileData = { mesh: hintTileMesh, box: hintTileBox, active: true };
+                    hintTiles.push(hintTileData);
+                    hintTileBoxes.push(hintTileData);
+                    break;
             }
         }
     }
 
-    const mazeWidth = mazeCols * wallSize;
-    const mazeDepth = mazeRows * wallSize;
+
     grassTexture.repeat.set(mazeCols, mazeRows);
     const floorGeometry = new THREE.PlaneGeometry(mazeWidth, mazeDepth);
     floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
     floorMesh.rotation.x = -Math.PI / 2;
     floorMesh.position.y = 0;
-    floorMesh.position.x = (mazeCols / 2) * wallSize - wallSize / 2;
-    floorMesh.position.z = (mazeRows / 2) * wallSize - wallSize / 2;
+    floorMesh.position.x = mazeCenterX;
+    floorMesh.position.z = mazeCenterZ;
     floorMesh.receiveShadow = true;
     scene.add(floorMesh);
 
     if (winPos) {
-        // Create win plate using the new basic material
         winPlateMesh = new THREE.Mesh(winPlateGeometry, winPlateMaterial);
         winPlateMesh.position.set(winPos.x, 0.1, winPos.z);
-        // Basic materials don't interact with shadows
         winPlateMesh.receiveShadow = false;
         winPlateMesh.castShadow = false;
         scene.add(winPlateMesh);
@@ -249,9 +286,13 @@ function setupLevel(levelIndex) {
     chaserPath = [];
     currentPathIndex = 0;
     timeSinceLastPathRecalc = pathRecalcInterval;
+    lastPathPlayerGrid = null;
 
     levelNumberSpan.textContent = levelIndex + 1;
     levelIndicator.style.display = 'block';
+
+    hintCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+
 
     gameOver = false;
     gameWon = false;
@@ -285,7 +326,8 @@ scene.add(chaserMesh);
 let chaserPath = [];
 let currentPathIndex = 0;
 let timeSinceLastPathRecalc = 0;
-const pathRecalcInterval = 0.5;
+const pathRecalcInterval = 1.0;
+let lastPathPlayerGrid = null;
 const directChaseDistanceThresholdSq = (wallSize * 2.5) * (wallSize * 2.5);
 const veryCloseDistanceSq = (wallSize * 0.5) * (wallSize * 0.5);
 const raycaster = new THREE.Raycaster();
@@ -295,11 +337,11 @@ const chaserRayDirection = new THREE.Vector3();
 const keyState = {};
 window.addEventListener('keydown', (event) => {
     keyState[event.code] = true;
-     if (event.code === 'Space' && onGround && !gameOver && !gameWon && gameStarted && !isPaused) {
+     if (event.code === 'Space' && onGround && !gameOver && !gameWon && gameStarted && !isPaused && !isShowingHint) {
         playerVelocityY = selectedJumpStrength;
         onGround = false;
     }
-     if (event.code === 'Escape' && isPointerLocked && gameStarted && !gameOver && !gameWon) {
+     if (event.code === 'Escape' && isPointerLocked && gameStarted && !gameOver && !gameWon && !isShowingHint) {
          document.exitPointerLock();
      }
 });
@@ -333,6 +375,7 @@ function startGame(characterType) {
     isPaused = false;
     gameOver = false;
     gameWon = false;
+    isShowingHint = false;
     pauseScreen.classList.remove('visible');
     pauseScreen.classList.add('hidden');
     gameOverScreen.style.display = 'none';
@@ -353,7 +396,7 @@ document.querySelectorAll('.character-option .selectButton').forEach(button => {
 });
 
 renderer.domElement.addEventListener('click', () => {
-    if (!isPointerLocked && gameStarted && !gameOver && !gameWon && !isPaused) {
+    if (!isPointerLocked && gameStarted && !gameOver && !gameWon && !isPaused && !isShowingHint) {
         renderer.domElement.requestPointerLock();
     }
 });
@@ -371,7 +414,7 @@ document.addEventListener('pointerlockchange', () => {
         document.addEventListener('mousemove', onMouseMove, false);
         if (previouslyPaused) {
             resumeGame();
-        } else if (gameStarted && !gameOver && !gameWon) {
+        } else if (gameStarted && !gameOver && !gameWon && !isShowingHint) {
              instructionsDiv.style.display = 'block';
              setTimeout(() => { if(isPointerLocked && !isPaused) instructionsDiv.style.display = 'none'; }, 3000);
              pauseScreen.classList.remove('visible');
@@ -379,7 +422,7 @@ document.addEventListener('pointerlockchange', () => {
         }
     } else {
         document.removeEventListener('mousemove', onMouseMove, false);
-        if (gameStarted && !gameOver && !gameWon) {
+        if (gameStarted && !gameOver && !gameWon && !isShowingHint) {
             pauseGame();
         }
     }
@@ -388,13 +431,13 @@ document.addEventListener('pointerlockchange', () => {
 document.addEventListener('pointerlockerror', (e) => {
     isPointerLocked = false;
     document.removeEventListener('mousemove', onMouseMove, false);
-    if (gameStarted && !gameOver && !gameWon && !isPaused) {
+    if (gameStarted && !gameOver && !gameWon && !isPaused && !isShowingHint) {
          pauseGame();
     }
 }, false);
 
 function pauseGame() {
-    if (!gameStarted || gameOver || gameWon || isPaused) return;
+    if (!gameStarted || gameOver || gameWon || isPaused || isShowingHint) return;
     isPaused = true;
     pauseScreen.classList.remove('hidden');
     pauseScreen.style.display = 'flex';
@@ -421,7 +464,7 @@ function resumeGame() {
 }
 
 function onMouseMove(event) {
-    if (!isPointerLocked || gameOver || gameWon || !gameStarted || isPaused) return;
+    if (!isPointerLocked || gameOver || gameWon || !gameStarted || isPaused || isShowingHint) return;
     const movementX = event.movementX || 0;
     const movementY = event.movementY || 0;
 
@@ -461,17 +504,36 @@ function checkPlayerWinCollision() {
     return playerFeetCollider.intersectsBox(winPlateBox);
 }
 
+function checkPlayerHintCollision() {
+    const playerFeetPos = camera.position.clone();
+    playerFeetPos.y = 0.1;
+    const playerFeetCollider = new THREE.Box3().setFromCenterAndSize(
+        playerFeetPos,
+        new THREE.Vector3(playerRadius, 0.2, playerRadius)
+    );
+
+    for (let i = 0; i < hintTileBoxes.length; i++) {
+        const hintTileData = hintTileBoxes[i];
+        if (hintTileData.active && playerFeetCollider.intersectsBox(hintTileData.box)) {
+            return hintTileData;
+        }
+    }
+    return null;
+}
+
 function checkChaserWallCollisionWithMove(currentPos, moveVec) {
     const nextPos = currentPos.clone().add(moveVec);
     chaserCollider.center.copy(nextPos);
     chaserCollider.center.y = chaserRadius;
+
     for (const wallBox of wallBoxes) {
-        if (chaserCollider.intersectsBox(wallBox) && chaserCollider.max.y > wallBox.min.y + 0.1) {
+        if (chaserCollider.intersectsBox(wallBox) && (chaserCollider.center.y + chaserCollider.radius) > wallBox.min.y + 0.1) {
             return true;
         }
     }
     return false;
 }
+
 
 function gridToWorld(row, col) {
     return new THREE.Vector3(col * wallSize, 0, row * wallSize);
@@ -515,7 +577,7 @@ function findPath(startWorldPos, endWorldPos) {
     const startKey = `${startGrid.row},${startGrid.col}`; openSet.set(startKey, startNode);
 
     let iterations = 0;
-    const maxIterations = mazeRows * mazeCols * 2;
+    const maxIterations = mazeRows * mazeCols * 1.5;
 
     while (openSet.size > 0 && iterations < maxIterations) {
         iterations++;
@@ -569,26 +631,30 @@ function findPath(startWorldPos, endWorldPos) {
     return [];
 }
 
+
 function hasLineOfSight(startPos, endPos) {
-    chaserRayOrigin.copy(startPos); chaserRayOrigin.y = chaserRadius;
-    chaserRayDirection.copy(endPos).sub(startPos);
+    chaserRayOrigin.copy(startPos);
+    chaserRayOrigin.y = chaserRadius;
+
+    chaserRayDirection.copy(endPos).sub(chaserRayOrigin);
     const distance = chaserRayDirection.length();
-    chaserRayDirection.y = 0;
-    chaserRayDirection.normalize();
 
     if (distance < 0.1) return true;
+
+    chaserRayDirection.normalize();
 
     raycaster.set(chaserRayOrigin, chaserRayDirection);
     raycaster.far = distance;
     const intersects = raycaster.intersectObjects(wallMeshes);
 
     for (let i = 0; i < intersects.length; i++) {
-        if (intersects[i].distance < distance - 0.1) {
+        if (intersects[i].distance > 0.1 && intersects[i].distance < distance - 0.1) {
             return false;
         }
     }
     return true;
 }
+
 
 function triggerGameOver() {
     if (gameOver || gameWon) return;
@@ -602,11 +668,19 @@ function triggerGameOver() {
     pauseScreen.classList.remove('visible');
     pauseScreen.classList.add('hidden');
     pauseScreen.style.display = 'none';
+    if (playerMarkerMesh) {
+        scene.remove(playerMarkerMesh);
+        playerMarkerMesh = null;
+    }
     if (isPointerLocked) document.exitPointerLock();
 }
 
 function triggerLevelComplete() {
     if (gameOver || gameWon) return;
+    if (playerMarkerMesh) {
+        scene.remove(playerMarkerMesh);
+        playerMarkerMesh = null;
+    }
     currentLevel++;
     if (currentLevel >= mazeLayouts.length) {
         triggerGameWon();
@@ -629,6 +703,10 @@ function triggerGameWon() {
     pauseScreen.classList.remove('visible');
     pauseScreen.classList.add('hidden');
     pauseScreen.style.display = 'none';
+     if (playerMarkerMesh) {
+        scene.remove(playerMarkerMesh);
+        playerMarkerMesh = null;
+    }
     if (isPointerLocked) document.exitPointerLock();
 }
 
@@ -645,20 +723,58 @@ const chaserMoveDir = new THREE.Vector3();
 const targetReachedThresholdSq = 0.3 * 0.3;
 const tempChaserPos = new THREE.Vector3();
 const tempPlayerPos = new THREE.Vector3();
+const tempTargetPos = new THREE.Vector3();
+const tempVec = new THREE.Vector3();
 
 function animate() {
     requestAnimationFrame(animate);
+
+    const delta = clock.getDelta();
+    const elapsedTime = clock.getElapsedTime();
+
+    if (isShowingHint) {
+        const hintElapsedTime = elapsedTime - hintStartTime;
+        const progress = Math.min(hintElapsedTime / hintDuration, 1.0);
+
+        hintCamera.position.lerpVectors(hintCamStartPos, hintCamEndPos, progress);
+        hintCamCurrentLookAt.lerpVectors(hintCamStartLookAt, hintCamEndLookAt, progress);
+        hintCamera.lookAt(hintCamCurrentLookAt);
+        hintCamera.updateProjectionMatrix();
+
+        if (playerMarkerMesh) {
+             playerMarkerMesh.material.opacity = 1.0 - progress * 0.75;
+        }
+
+
+        renderer.render(scene, hintCamera);
+
+        if (hintElapsedTime >= hintDuration) {
+            isShowingHint = false;
+            camera.position.copy(originalCameraPosition);
+            camera.rotation.copy(originalCameraRotation);
+            camera.updateProjectionMatrix();
+            if (playerMarkerMesh) {
+                scene.remove(playerMarkerMesh);
+                playerMarkerMesh = null;
+            }
+             if (!isPointerLocked && gameStarted && !gameOver && !gameWon && !isPaused) {
+                 renderer.domElement.requestPointerLock();
+             }
+        }
+        return;
+    }
+
 
     if (!gameStarted || gameOver || gameWon || isPaused || !clock.running) {
          renderer.render(scene, camera);
          return;
     }
 
-    const delta = Math.min(clock.getDelta(), 0.05);
-    timeSinceLastPathRecalc += delta;
+    const clampedDelta = Math.min(delta, 0.05);
+    timeSinceLastPathRecalc += clampedDelta;
 
     playerMoveDirection.set(0, 0, 0);
-    const moveDistance = selectedMoveSpeed * delta;
+    const moveDistance = selectedMoveSpeed * clampedDelta;
     camera.getWorldDirection(forward); forward.y = 0; forward.normalize();
     right.crossVectors(camera.up, forward).normalize();
 
@@ -687,8 +803,8 @@ function animate() {
         }
     }
 
-    playerVelocityY -= gravity * delta;
-    camera.position.y += playerVelocityY * delta;
+    playerVelocityY -= gravity * clampedDelta;
+    camera.position.y += playerVelocityY * clampedDelta;
 
     if (camera.position.y <= playerHeight) {
         camera.position.y = playerHeight;
@@ -698,70 +814,125 @@ function animate() {
         onGround = false;
     }
 
+    const collidedHintTileData = checkPlayerHintCollision();
+    if (collidedHintTileData) {
+        isShowingHint = true;
+        hintStartTime = elapsedTime;
+        originalCameraPosition.copy(camera.position);
+        originalCameraRotation.copy(camera.rotation);
+
+        if (playerMarkerMesh) scene.remove(playerMarkerMesh);
+        playerMarkerMesh = new THREE.Mesh(playerMarkerGeometry, playerMarkerMaterial.clone());
+        playerMarkerMesh.position.set(camera.position.x, playerHeight + 0.1, camera.position.z);
+        scene.add(playerMarkerMesh);
+
+        const playerDir = camera.getWorldDirection(tempVec);
+        hintCamStartPos.copy(camera.position).add(playerDir.multiplyScalar(-8)).add(new THREE.Vector3(0, 5, 0));
+        hintCamEndPos.set(mazeCenterX, Math.max(mazeWidth, mazeDepth) * 1.5, mazeCenterZ + Math.max(mazeWidth, mazeDepth) * 0.5); // High angle end pos
+        hintCamStartLookAt.copy(playerMarkerMesh.position);
+        hintCamEndLookAt.set(mazeCenterX, 0, mazeCenterZ);
+
+        hintCamera.position.copy(hintCamStartPos);
+        hintCamCurrentLookAt.copy(hintCamStartLookAt);
+        hintCamera.lookAt(hintCamCurrentLookAt);
+        hintCamera.updateProjectionMatrix();
+
+
+        collidedHintTileData.active = false;
+        scene.remove(collidedHintTileData.mesh);
+        const index = hintTileBoxes.indexOf(collidedHintTileData);
+        if (index > -1) {
+            hintTileBoxes.splice(index, 1);
+        }
+
+        if (isPointerLocked) {
+             document.exitPointerLock();
+        }
+
+        renderer.render(scene, hintCamera);
+        return;
+    }
+
+
     if (checkPlayerWinCollision()) {
         triggerLevelComplete();
         renderer.render(scene, camera);
         return;
     }
 
-    // --- Chaser AI and Movement ---
     tempChaserPos.copy(chaserMesh.position);
-    tempPlayerPos.copy(camera.position); tempPlayerPos.y = chaserRadius;
+    tempPlayerPos.copy(camera.position);
     const distanceToPlayerSq = tempChaserPos.distanceToSquared(tempPlayerPos);
     let useDirectChase = false;
     let needsNewPath = false;
+    const currentLayout = mazeLayouts[currentLevel];
+    const playerGrid = worldToGrid(tempPlayerPos);
 
     const hasLOS = hasLineOfSight(tempChaserPos, tempPlayerPos);
 
     if (distanceToPlayerSq < directChaseDistanceThresholdSq && hasLOS) {
         useDirectChase = true;
-        chaserPath = [];
+        if (chaserPath.length > 0) {
+             chaserPath = [];
+        }
         currentPathIndex = 0;
+        lastPathPlayerGrid = null;
     } else {
         useDirectChase = false;
+        tempTargetPos.copy(tempPlayerPos);
+        tempTargetPos.y = chaserRadius;
+
+        needsNewPath = false;
         if (chaserPath.length === 0 && distanceToPlayerSq > veryCloseDistanceSq) {
              needsNewPath = true;
         } else if (timeSinceLastPathRecalc > pathRecalcInterval && distanceToPlayerSq > veryCloseDistanceSq) {
-             needsNewPath = true;
+             const targetGrid = worldToGrid(tempTargetPos);
+             if (!lastPathPlayerGrid || lastPathPlayerGrid.row !== targetGrid.row || lastPathPlayerGrid.col !== targetGrid.col) {
+                 needsNewPath = true;
+             } else {
+                 timeSinceLastPathRecalc = 0;
+             }
         } else if (chaserPath.length > 0) {
              const pathEndGrid = worldToGrid(chaserPath[chaserPath.length - 1]);
-             const playerGrid = worldToGrid(tempPlayerPos);
-             if (Math.abs(pathEndGrid.row - playerGrid.row) > 1 || Math.abs(pathEndGrid.col - playerGrid.col) > 1) {
+             const targetGrid = worldToGrid(tempTargetPos);
+             if (Math.abs(pathEndGrid.row - targetGrid.row) > 1 || Math.abs(pathEndGrid.col - targetGrid.col) > 1) {
                  needsNewPath = true;
              }
              if (currentPathIndex >= chaserPath.length && distanceToPlayerSq > veryCloseDistanceSq) {
                  needsNewPath = true;
              }
         }
-    }
 
-    chaserMoveDir.set(0,0,0);
-    if (useDirectChase) {
-        chaserMoveDir.copy(tempPlayerPos).sub(tempChaserPos); chaserMoveDir.y = 0;
-    } else {
-         if (needsNewPath) {
-             chaserPath = findPath(tempChaserPos, tempPlayerPos);
+        if (needsNewPath) {
+             chaserPath = findPath(tempChaserPos, tempTargetPos);
              currentPathIndex = 0;
              if (chaserPath.length > 1 && tempChaserPos.distanceToSquared(chaserPath[0]) < (wallSize*0.2)**2 ) {
                   currentPathIndex = 1;
              }
              timeSinceLastPathRecalc = 0;
+             lastPathPlayerGrid = worldToGrid(tempTargetPos);
          }
+    }
 
+    chaserMoveDir.set(0,0,0);
+    if (useDirectChase) {
+        chaserMoveDir.copy(tempPlayerPos).sub(tempChaserPos);
+        chaserMoveDir.y = 0;
+    } else {
          if (chaserPath.length > 0 && currentPathIndex < chaserPath.length) {
              chaserTargetPoint.copy(chaserPath[currentPathIndex]);
              chaserTargetPoint.y = chaserRadius;
-             const lookaheadIndex = Math.min(currentPathIndex + 1, chaserPath.length - 1);
-             chaserDirectionTarget.copy(chaserPath[lookaheadIndex]);
-             chaserDirectionTarget.y = chaserRadius;
+             chaserDirectionTarget.copy(chaserTargetPoint);
              chaserMoveDir.copy(chaserDirectionTarget).sub(tempChaserPos);
              chaserMoveDir.y = 0;
+
              tempChaserPos.y = chaserRadius;
              const distToArrivalNodeSq = tempChaserPos.distanceToSquared(chaserTargetPoint);
              if (distToArrivalNodeSq < targetReachedThresholdSq) {
                  currentPathIndex++;
                  if (currentPathIndex >= chaserPath.length) {
                      chaserPath = [];
+                     lastPathPlayerGrid = null;
                  }
              }
          }
@@ -769,41 +940,58 @@ function animate() {
 
     if(chaserMoveDir.lengthSq() > 0.0001) {
         chaserMoveDir.normalize();
-        const chaserFrameSpeed = chaserSpeed * delta;
+        const chaserFrameSpeed = chaserSpeed * clampedDelta;
         const moveAmount = chaserMoveDir.clone().multiplyScalar(chaserFrameSpeed);
+        let moved = false;
+        const currentPos = chaserMesh.position.clone();
 
-        if (!checkChaserWallCollisionWithMove(chaserMesh.position, moveAmount)) {
+        let directCollision = checkChaserWallCollisionWithMove(currentPos, moveAmount);
+
+        if (!directCollision) {
             chaserMesh.position.add(moveAmount);
+            moved = true;
         } else {
              const moveX = new THREE.Vector3(moveAmount.x, 0, 0);
              const moveZ = new THREE.Vector3(0, 0, moveAmount.z);
-             tempChaserPos.copy(chaserMesh.position);
-             if (moveX.lengthSq() > 0.0001 && !checkChaserWallCollisionWithMove(tempChaserPos, moveX)) {
-                 chaserMesh.position.add(moveX);
-                 tempChaserPos.add(moveX);
+
+             if (Math.abs(moveAmount.x) > 0.001) {
+                let xCollision = checkChaserWallCollisionWithMove(currentPos, moveX);
+                if (!xCollision) {
+                     chaserMesh.position.add(moveX);
+                     moved = true;
+                 }
              }
-             if (moveZ.lengthSq() > 0.0001 && !checkChaserWallCollisionWithMove(tempChaserPos, moveZ)) {
-                 chaserMesh.position.add(moveZ);
+             if (!moved && Math.abs(moveAmount.z) > 0.001) {
+                 let zCollision = checkChaserWallCollisionWithMove(currentPos, moveZ);
+                 if (!zCollision) {
+                     chaserMesh.position.add(moveZ);
+                     moved = true;
+                 }
              }
         }
-         chaserCollider.center.copy(chaserMesh.position);
-    } else {
-        chaserCollider.center.copy(chaserMesh.position);
+
+        if (moved) {
+             chaserCollider.center.copy(chaserMesh.position);
+        }
     }
+    chaserCollider.center.copy(chaserMesh.position);
+
 
     const playerChaserDistSqXY = new THREE.Vector2(camera.position.x, camera.position.z)
                                     .distanceToSquared(new THREE.Vector2(chaserMesh.position.x, chaserMesh.position.z));
     const collisionThresholdXY = playerRadius + chaserRadius * 0.8;
     const collisionThresholdSqXY = collisionThresholdXY * collisionThresholdXY;
 
-    const playerBottom = camera.position.y - playerHeight;
-    const playerTop = camera.position.y;
-    const chaserBottom = chaserMesh.position.y - chaserRadius;
-    const chaserTop = chaserMesh.position.y + chaserRadius;
-    const verticalOverlap = (playerBottom < chaserTop) && (playerTop > chaserBottom);
+    if (playerChaserDistSqXY < collisionThresholdSqXY) {
+        const playerBottom = camera.position.y - playerHeight;
+        const playerTop = camera.position.y;
+        const chaserBottom = chaserMesh.position.y - chaserRadius;
+        const chaserTop = chaserMesh.position.y + chaserRadius;
+        const verticalOverlap = (playerBottom < chaserTop) && (playerTop > chaserBottom);
 
-    if (playerChaserDistSqXY < collisionThresholdSqXY && verticalOverlap) {
-        triggerGameOver();
+        if (verticalOverlap) {
+            triggerGameOver();
+        }
     }
 
     renderer.render(scene, camera);
@@ -812,6 +1000,10 @@ function animate() {
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
+    if (hintCamera) {
+        hintCamera.aspect = window.innerWidth / window.innerHeight;
+        hintCamera.updateProjectionMatrix();
+    }
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
